@@ -7,12 +7,12 @@ Send ALT+Y to the specified process
 Uses user32.dll and Windows.Forms to active a process and send the ALT+Y key combination.
 
 .NOTES   
-Name:        Invoke-DirtyGUIHelper.ps1
-Author:      Jaap Brasser
-Version:     1.0
+Name       : Invoke-DirtyGUIHelper.ps1
+Author     : Jaap Brasser
+Version    : 1.0
 DateCreated: 2016-05-03
 DateUpdated: 2016-05-03
-Blog:        http://www.jaapbrasser.com
+Blog       : http://www.jaapbrasser.com
 
 .LINK
 http://www.jaapbrasser.com
