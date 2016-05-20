@@ -42,25 +42,44 @@ Will create a new ISO using the default values as specified in the parameter blo
 #>
     [cmdletbinding(SupportsShouldProcess)]
     param (
-        [string] $ESDFile        = (Get-Item -Path .\Install.esd | Select-Object -ExpandProperty FullName),
-        [string] $PathToOscdimg  = (Get-Item -Path .\oscdimg.exe | Select-Object -ExpandProperty FullName),
+        [string] $ESDFile        = (Get-Item -Path .\Install.esd -ErrorAction SilentlyContinue |
+                                    Select-Object -ExpandProperty FullName),
+        [string] $PathToOscdimg  = (Get-Item -Path .\oscdimg.exe -ErrorAction SilentlyContinue |
+                                    Select-Object -ExpandProperty FullName),
         [string] $ISOMediaFolder = (Join-Path (Get-Location) 'Media'),
         [switch] $CleanMedia
     )
     
     process {
-        if (-not (Test-Path $ESDFile) -and -not (Test-Path -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd')) {
-            Throw 'Could not find Install.esd, please ensure this file is present in the current folder'
-        } elseif (-not (Test-Path .\Install.esd)) {
-            Copy-Item -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd' -Destination '.\Install.esd'
+        if ($ESDFile) {
+            if (-not (Test-Path -LiteralPath $ESDFile -EA 0) -and -not (Test-Path -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd')) {
+                Throw 'Could not find Install.esd, please ensure this file is present in the current folder'
+            } elseif (-not (Test-Path .\Install.esd)) {
+                Write-Verbose 'Copying Install.esd from ''C:\$WINDOWS.~BT\Sources\'''
+                Copy-Item -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd' -Destination '.\Install.esd'
+            }
         }
 
-        Write-Verbose -Message 'Create ISO folder structure'
-        New-Item -ItemType Directory $ISOMediaFolder
+        try {
+            Get-Item -Path .\Install.esd -ErrorAction Stop
+        } catch {
+            throw $_
+        }
+
+        if (-not (Test-Path -LiteralPath $ISOMediaFolder)) {
+            Write-Verbose -Message 'Create ISO folder'
+            New-Item -ItemType Directory $ISOMediaFolder -ErrorAction SilentlyContinue
+        }
+
+        if (Get-ChildItem -LiteralPath $ISOMediaFolder) {
+            Write-Warning "Folder '$ISOMediaFolder' already contains files, this might interfere with ISO creation"
+        }
+        
+        Write-Verbose -Message 'Create ISO folder structure using dism.exe'
         dism.exe /Apply-Image /ImageFile:$ESDFile /Index:1 /ApplyDir:$ISOMediaFolder
   
         Write-Verbose -Message 'Create empty boot.wim file with compression type set to maximum'
-        New-Item -ItemType Directory 'C:\EmptyFolder'
+        New-Item -ItemType Directory 'C:\EmptyFolder' -ErrorAction SilentlyContinue
         dism.exe /Capture-Image /ImageFile:$ISOMediaFolder\sources\boot.wim /CaptureDir:C:\EmptyFolder /Name:EmptyIndex /Compress:max
   
         Write-Verbose -Message 'Export base Windows PE to empty boot.wim file (creating a second index)'
@@ -90,7 +109,7 @@ Will create a new ISO using the default values as specified in the parameter blo
         Write-Verbose -Message 'Create the Windows Technical Preview ISO, For more info on the Oscdimg.exe commands, check this post: http://support2.microsoft.com/kb/947024'
   
         $BootData='2#p0,e,b"{0}"#pEF,e,b"{1}"' -f "$ISOMediaFolder\boot\etfsboot.com","$ISOMediaFolder\efi\Microsoft\boot\efisys.bin"
-        $NewISO  = "Windows $((Get-Item -Path (Join-Path $ISOMediaFolder Setup.exe)).VersionInfo.FileVersion).iso" -replace '\s','_'
+        $NewISO  = "windows_10_insider_preview_$((Get-Item -Path (Join-Path $ISOMediaFolder Setup.exe)).VersionInfo.FileVersion).iso" -replace '\s'
 
         $Proc = Start-Process -FilePath $PathToOscdimg -ArgumentList @("-bootdata:$BootData",'-u2','-udfver102',"$ISOMediaFolder","$NewISO") -PassThru -Wait -NoNewWindow
         if($Proc.ExitCode -ne 0) {
