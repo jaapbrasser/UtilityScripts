@@ -109,7 +109,7 @@ Will create a new ISO using the default values as specified in the parameter blo
         Write-Verbose -Message 'Create the Windows Technical Preview ISO, For more info on the Oscdimg.exe commands, check this post: http://support2.microsoft.com/kb/947024'
   
         $BootData='2#p0,e,b"{0}"#pEF,e,b"{1}"' -f "$ISOMediaFolder\boot\etfsboot.com","$ISOMediaFolder\efi\Microsoft\boot\efisys.bin"
-        $NewISO  = "windows_10_insider_preview_$((Get-Item -Path (Join-Path $ISOMediaFolder Setup.exe)).VersionInfo.FileVersion).iso" -replace '\s'
+        $NewISO  = "windows_10_insider_preview_$((Get-Item -Path (Join-Path $ISOMediaFolder Setup.exe)).VersionInfo.FileVersion).iso" -replace '\s|\(|\)'
 
         $Proc = Start-Process -FilePath $PathToOscdimg -ArgumentList @("-bootdata:$BootData",'-u2','-udfver102',"$ISOMediaFolder","$NewISO") -PassThru -Wait -NoNewWindow
         if($Proc.ExitCode -ne 0) {
