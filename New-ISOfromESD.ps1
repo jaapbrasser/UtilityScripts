@@ -4,7 +4,7 @@
 Create a Windows 10 Image from a fast track ESD
 
 .DESCRIPTION
-Script originally created by Johan Arvid, I have adapted this script so it can run without any hardcoded variables and created a function out of it. The orginal can be found here: http://deploymentresearch.com/Research/Post/399/How-to-REALLY-create-a-Windows-10-ISO-no-3rd-party-tools-needed
+Script originally created by Johan Arvid, I have adapted this script so it can run without any hardcoded variables and used the script to create this function. The orginal can be found here: http://deploymentresearch.com/Research/Post/399/How-to-REALLY-create-a-Windows-10-ISO-no-3rd-party-tools-needed
 
 .NOTES   
 Name       : New-ISOfromESD.ps1
@@ -12,7 +12,7 @@ Author     : Johan Arwidmark
 UpdatedBy  : Jaap Brasser
 Version    : 1.0
 DateCreated: 2016-05-03
-DateUpdated: 2016-05-03
+DateUpdated: 2016-06-24
 
 .PARAMETER ESDFile
 The location of the ESD File, this function will assume the current folder if it cannot find the file. If it cannot be found there it will attempt to copy it from: C:\$WINDOWS.~BT\Sources\Install.esd
@@ -51,24 +51,25 @@ Will create a new ISO using the default values as specified in the parameter blo
     )
     
     process {
-        if ($ESDFile) {
-            if (-not (Test-Path -LiteralPath $ESDFile -EA 0) -and -not (Test-Path -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd')) {
+        if (-not $ESDFile) {
+            if (-not (Test-Path -LiteralPath '.\Install.esd' -EA 0) -and -not (Test-Path -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd')) {
                 Throw 'Could not find Install.esd, please ensure this file is present in the current folder'
             } elseif (-not (Test-Path .\Install.esd)) {
                 Write-Verbose 'Copying Install.esd from ''C:\$WINDOWS.~BT\Sources\'''
                 Copy-Item -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd' -Destination '.\Install.esd'
             }
+            $ESDFile = '.\Install.esd'
         }
 
         try {
-            Get-Item -Path .\Install.esd -ErrorAction Stop
+            $null = Get-Item -Path $ESDFile -ErrorAction Stop
         } catch {
             throw $_
         }
 
         if (-not (Test-Path -LiteralPath $ISOMediaFolder)) {
             Write-Verbose -Message 'Create ISO folder'
-            New-Item -ItemType Directory $ISOMediaFolder -ErrorAction SilentlyContinue
+            $null = New-Item -ItemType Directory $ISOMediaFolder -ErrorAction SilentlyContinue
         }
 
         if (Get-ChildItem -LiteralPath $ISOMediaFolder) {

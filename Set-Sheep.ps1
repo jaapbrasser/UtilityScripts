@@ -65,7 +65,7 @@ function Set-Wallpaper {
     Param(
        [Parameter(Position=0, Mandatory=$true, ValueFromPipelineByPropertyName=$true)]
        [Alias('FullName')]
-        [string]         $Path,
+       [string]          $Path,
        [Parameter(Position=1, Mandatory=$false)]
        [Wallpaper.Style] $Style = 'NoChange'
     )
