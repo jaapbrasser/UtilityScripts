@@ -53,11 +53,12 @@ Will create a new ISO using the default values as specified in the parameter blo
     process {
         if (-not $ESDFile) {
             if (-not (Test-Path -LiteralPath '.\Install.esd' -EA 0) -and -not (Test-Path -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd')) {
-                Throw 'Could not find Install.esd, please ensure this file is present in the current folder'
+                Throw 'Could not find Install.esd, please ensure this file is present in the current folder or in C:\$WINDOWS.~BT\Sources'
             } elseif (-not (Test-Path .\Install.esd)) {
                 Write-Verbose 'Copying Install.esd from ''C:\$WINDOWS.~BT\Sources\'''
                 Copy-Item -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd' -Destination '.\Install.esd'
             }
+            Write-Verbose ('Install.esd location in: {0}' -f (Join-Path -Path (Get-Location) -ChildPath 'Install.esd'))
             $ESDFile = '.\Install.esd'
         }
 
@@ -78,9 +79,9 @@ Will create a new ISO using the default values as specified in the parameter blo
         
         Write-Verbose -Message 'Create ISO folder structure using dism.exe'
         dism.exe /Apply-Image /ImageFile:$ESDFile /Index:1 /ApplyDir:$ISOMediaFolder
-  
+        
         Write-Verbose -Message 'Create empty boot.wim file with compression type set to maximum'
-        New-Item -ItemType Directory 'C:\EmptyFolder' -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Path 'C:\EmptyFolder' -ErrorAction SilentlyContinue
         dism.exe /Capture-Image /ImageFile:$ISOMediaFolder\sources\boot.wim /CaptureDir:C:\EmptyFolder /Name:EmptyIndex /Compress:max
   
         Write-Verbose -Message 'Export base Windows PE to empty boot.wim file (creating a second index)'
@@ -110,7 +111,11 @@ Will create a new ISO using the default values as specified in the parameter blo
         Write-Verbose -Message 'Create the Windows Technical Preview ISO, For more info on the Oscdimg.exe commands, check this post: http://support2.microsoft.com/kb/947024'
   
         $BootData='2#p0,e,b"{0}"#pEF,e,b"{1}"' -f "$ISOMediaFolder\boot\etfsboot.com","$ISOMediaFolder\efi\Microsoft\boot\efisys.bin"
-        $NewISO  = "windows_10_insider_preview_$((Get-Item -Path (Join-Path $ISOMediaFolder Setup.exe)).VersionInfo.FileVersion).iso" -replace '\s|\(|\)'
+        $ItemSplat = @{
+            Path        = Join-Path -Path $ISOMediaFolder -ChildPath 'Setup.exe'
+            ErrorAction = 'SilentlyContinue'
+        }
+        $NewISO  = ("windows_10_insider_preview_$((Get-Item @ItemSplat).VersionInfo.FileVersion).iso" -replace '\s|\(|\)') -replace 'rs1','_rs1'
 
         $Proc = Start-Process -FilePath $PathToOscdimg -ArgumentList @("-bootdata:$BootData",'-u2','-udfver102',"$ISOMediaFolder","$NewISO") -PassThru -Wait -NoNewWindow
         if($Proc.ExitCode -ne 0) {
