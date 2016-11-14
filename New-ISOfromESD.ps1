@@ -46,8 +46,7 @@ Will create a new ISO using the default values as specified in the parameter blo
                                     Select-Object -ExpandProperty FullName),
         [string] $PathToOscdimg  = (Get-Item -Path .\oscdimg.exe -ErrorAction SilentlyContinue |
                                     Select-Object -ExpandProperty FullName),
-        [string] $ISOMediaFolder = (Join-Path (Get-Location) 'Media'),
-        [switch] $CleanMedia
+        [string] $ISOMediaFolder = (Join-Path (Get-Location) 'Media')
     )
     
     process {
@@ -55,11 +54,13 @@ Will create a new ISO using the default values as specified in the parameter blo
             if (-not (Test-Path -LiteralPath '.\Install.esd' -EA 0) -and -not (Test-Path -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd')) {
                 Throw 'Could not find Install.esd, please ensure this file is present in the current folder or in C:\$WINDOWS.~BT\Sources'
             } elseif (-not (Test-Path .\Install.esd)) {
-                Write-Verbose 'Copying Install.esd from ''C:\$WINDOWS.~BT\Sources\'''
-                Copy-Item -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd' -Destination '.\Install.esd'
+                #Write-Verbose 'Copying Install.esd from ''C:\$WINDOWS.~BT\Sources\'''
+                #Copy-Item -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd' -Destination '.\Install.esd'
+                Write-Verbose "Install.esd located in: 'C:\$WINDOWS.~BT\Sources\'"
+                $ESDFile = 'C:\$WINDOWS.~BT\Sources\Install.esd'
             }
-            Write-Verbose ('Install.esd location in: {0}' -f (Join-Path -Path (Get-Location) -ChildPath 'Install.esd'))
-            $ESDFile = '.\Install.esd'
+            #Write-Verbose ('Install.esd location in: {0}' -f (Join-Path -Path (Get-Location) -ChildPath 'Install.esd'))
+            #$ESDFile = '.\Install.esd'
         }
 
         try {
@@ -122,9 +123,7 @@ Will create a new ISO using the default values as specified in the parameter blo
             Write-Error "Failed to generate ISO with exitcode: $($Proc.ExitCode)"
         }
 
-        if ($CleanMedia) {
-            Write-Verbose -Message "Cleaning up remaining files in $ISOMediaFolder"
-            Remove-Item -Recurse -Path $ISOMediaFolder
-        }
+        Write-Verbose -Message "Cleaning up remaining files in $ISOMediaFolder"
+        Remove-Item -Recurse -Path $ISOMediaFolder
     }
 }
