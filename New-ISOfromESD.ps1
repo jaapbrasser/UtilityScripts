@@ -14,10 +14,10 @@ Version    : 1.0
 DateCreated: 2016-05-03
 DateUpdated: 2016-06-24
 
-.PARAMETER ESDFile
+.PARAMETER ESDPath
 The location of the ESD File, this function will assume the current folder if it cannot find the file. If it cannot be found there it will attempt to copy it from: C:\$WINDOWS.~BT\Sources\Install.esd
 
-.PARAMETER PathToOscdimg
+.PARAMETER OscdimgPath
 Path to the oscdimg tool found in the Windows 10 ADK, required to generate the ISO
 
 .PARAMETER ISOMediaFolder
@@ -40,31 +40,28 @@ Description
 -----------     
 Will create a new ISO using the default values as specified in the parameter block. Will assume that the oscdimg.exe executable is present in the current path.
 #>
-    [cmdletbinding(SupportsShouldProcess)]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     param (
-        [string] $ESDFile        = (Get-Item -Path .\Install.esd -ErrorAction SilentlyContinue |
+        [string] $ESDPath        = (Get-Item -Path .\Install.esd -ErrorAction SilentlyContinue |
                                     Select-Object -ExpandProperty FullName),
-        [string] $PathToOscdimg  = (Get-Item -Path .\oscdimg.exe -ErrorAction SilentlyContinue |
+        [string] $OscdimgPath    = (Get-Item -Path .\oscdimg.exe -ErrorAction SilentlyContinue |
+
                                     Select-Object -ExpandProperty FullName),
         [string] $ISOMediaFolder = (Join-Path (Get-Location) 'Media')
     )
     
     process {
-        if (-not $ESDFile) {
+        if (-not $ESDPath) {
             if (-not (Test-Path -LiteralPath '.\Install.esd' -EA 0) -and -not (Test-Path -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd')) {
                 Throw 'Could not find Install.esd, please ensure this file is present in the current folder or in C:\$WINDOWS.~BT\Sources'
             } elseif (-not (Test-Path .\Install.esd)) {
-                #Write-Verbose 'Copying Install.esd from ''C:\$WINDOWS.~BT\Sources\'''
-                #Copy-Item -LiteralPath 'C:\$WINDOWS.~BT\Sources\Install.esd' -Destination '.\Install.esd'
-                Write-Verbose "Install.esd located in: 'C:\$WINDOWS.~BT\Sources\'"
-                $ESDFile = 'C:\$WINDOWS.~BT\Sources\Install.esd'
+                Write-Verbose 'Install.esd located in: ''C:\$WINDOWS.~BT\Sources\'''
+                $ESDPath = 'C:\$WINDOWS.~BT\Sources\Install.esd'
             }
-            #Write-Verbose ('Install.esd location in: {0}' -f (Join-Path -Path (Get-Location) -ChildPath 'Install.esd'))
-            #$ESDFile = '.\Install.esd'
         }
 
         try {
-            $null = Get-Item -Path $ESDFile -ErrorAction Stop
+            $null = Get-Item -Path $ESDPath -ErrorAction Stop
         } catch {
             throw $_
         }
@@ -79,20 +76,20 @@ Will create a new ISO using the default values as specified in the parameter blo
         }
         
         Write-Verbose -Message 'Create ISO folder structure using dism.exe'
-        dism.exe /Apply-Image /ImageFile:$ESDFile /Index:1 /ApplyDir:$ISOMediaFolder
+        dism.exe /Apply-Image /ImageFile:$ESDPath /Index:1 /ApplyDir:$ISOMediaFolder
         
         Write-Verbose -Message 'Create empty boot.wim file with compression type set to maximum'
         New-Item -ItemType Directory -Path 'C:\EmptyFolder' -ErrorAction SilentlyContinue
         dism.exe /Capture-Image /ImageFile:$ISOMediaFolder\sources\boot.wim /CaptureDir:C:\EmptyFolder /Name:EmptyIndex /Compress:max
   
         Write-Verbose -Message 'Export base Windows PE to empty boot.wim file (creating a second index)'
-        dism.exe /Export-image /SourceImageFile:$ESDFile /SourceIndex:2 /DestinationImageFile:$ISOMediaFolder\sources\boot.wim /Compress:Recovery /Bootable
+        dism.exe /Export-image /SourceImageFile:$ESDPath /SourceIndex:2 /DestinationImageFile:$ISOMediaFolder\sources\boot.wim /Compress:Recovery /Bootable
   
         Write-Verbose -Message 'Delete the first empty index in boot.wim'
         dism.exe /Delete-Image /ImageFile:$ISOMediaFolder\sources\boot.wim /Index:1
   
         Write-Verbose -Message 'Export Windows PE with Setup to boot.wim file'
-        dism.exe /Export-image /SourceImageFile:$ESDFile /SourceIndex:3 /DestinationImageFile:$ISOMediaFolder\sources\boot.wim /Compress:Recovery /Bootable
+        dism.exe /Export-image /SourceImageFile:$ESDPath /SourceIndex:3 /DestinationImageFile:$ISOMediaFolder\sources\boot.wim /Compress:Recovery /Bootable
   
         Write-Verbose -Message 'Display info from the created boot.wim'
         dism.exe /Get-WimInfo /WimFile:$ISOMediaFolder\sources\boot.wim
@@ -101,7 +98,7 @@ Will create a new ISO using the default values as specified in the parameter blo
         dism.exe /Capture-Image /ImageFile:$ISOMediaFolder\sources\install.wim /CaptureDir:C:\EmptyFolder /Name:EmptyIndex /Compress:max
   
         Write-Verbose -Message 'Export Windows Technical Preview to empty install.wim file'
-        dism.exe /Export-image /SourceImageFile:$ESDFile /SourceIndex:4 /DestinationImageFile:$ISOMediaFolder\sources\install.wim /Compress:Recovery
+        dism.exe /Export-image /SourceImageFile:$ESDPath /SourceIndex:4 /DestinationImageFile:$ISOMediaFolder\sources\install.wim /Compress:Recovery
   
         Write-Verbose -Message 'Delete the first empty index in install.wim'
         dism.exe /Delete-Image /ImageFile:$ISOMediaFolder\sources\install.wim /Index:1
@@ -118,7 +115,7 @@ Will create a new ISO using the default values as specified in the parameter blo
         }
         $NewISO  = ("windows_10_insider_preview_$((Get-Item @ItemSplat).VersionInfo.FileVersion).iso" -replace '\s|\(|\)') -replace 'rs1','_rs1'
 
-        $Proc = Start-Process -FilePath $PathToOscdimg -ArgumentList @("-bootdata:$BootData",'-u2','-udfver102',"$ISOMediaFolder","$NewISO") -PassThru -Wait -NoNewWindow
+        $Proc = Start-Process -FilePath $OscdimgPath -ArgumentList @("-bootdata:$BootData",'-u2','-udfver102',"$ISOMediaFolder","$NewISO") -PassThru -Wait -NoNewWindow
         if($Proc.ExitCode -ne 0) {
             Write-Error "Failed to generate ISO with exitcode: $($Proc.ExitCode)"
         }
