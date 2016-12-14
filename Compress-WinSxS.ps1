@@ -7,6 +7,40 @@
     }
 }
 
+function Invoke-ParseTakeOwn {
+    param(
+        [string[]] $InputObject
+    )
+    New-Object -TypeName PSCustomObject -Property @{
+        TakeOwnResultSuccess = ($InputObject -match 'Success').Count
+    }
+}
+
+function Invoke-ParseIcacls {
+    param(
+        [string[]] $InputObject
+    )
+    New-Object -TypeName PSCustomObject -Property @{
+        ACLResultSuccess = $InputObject[-1] -replace '.*?\s(\d*)\sfiles.*?$','$1' -as [long]
+        ACLResultFailed  = $InputObject[-1] -replace '.*?\s(\d*)\sfiles$','$1'    -as [long]
+        Target           = $InputObject[0]  -replace '.*?\:\s(.*?)$','$1'         -as [System.IO.DirectoryInfo]
+    }
+}
+
+function Invoke-ParseCompact {
+    param(
+        [string[]] $InputObject
+    )
+    New-Object -TypeName PSCustomObject -Property @{
+        Files              = $InputObject[-3] -replace '^(.*?)\s.*?\s(\d*?)\s.*?$','$1'           -as [long]
+        Folders            = $InputObject[-3] -replace '^(.*?)\s.*?\s(\d*?)\s.*?$','$2'           -as [long]
+        BytesPreCompressed = $InputObject[-2] -replace '^(.*?)\stotal.*$','$1' -replace '\D'      -as [long]
+        BytesCompressed    = $InputObject[-2] -replace '.*?in\s(.*?)\sbytes.*','$1' -replace '\D' -as [long]
+        CompressionRatio   = $InputObject[-1] -replace '.*?is\s(.*?)\sto.*?$','$1'                -as [decimal]
+        Target             = $InputObject[1] -replace '.*?in\s(.*?)$','$1'                        -as [System.IO.DirectoryInfo]
+    }
+}
+
 # Set startup mode to Disabled and store current startup configuration
 $Service = @{}
 if (Test-ServiceObject) {
@@ -27,15 +61,15 @@ Get-Service -Name msiserver,trustedinstaller | Stop-Service -Force -Verbose
 & ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /save "${env:userprofile}\Backupacl.acl"
 
 # Take ownership and set ACL
-& ${env:windir}\system32\takeown.exe /f "${env:windir}\WinSxS" /r
-& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /grant "${env:userdomain}\${env:username}:(F)" /t
+Invoke-ParseTakeOwn -InputObject (& ${env:windir}\system32\takeown.exe /f "${env:windir}\WinSxS" /r)
+Invoke-ParseIcacls -InputObject  (& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /grant "${env:userdomain}\${env:username}:(F)" /t)
 
 # Compress WinSxS
-& ${env:windir}\system32\compact.exe /s:"${env:windir}\WinSxS" /c /a /i *
+Invoke-ParseCompact -InputObject (& ${env:windir}\system32\compact.exe /s:"${env:windir}\WinSxS" /c /a /i *)
 
 # Restore WinSxS ACL
 & ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /setowner "NT SERVICE\TrustedInstaller" /t
-& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /restore "${env:userprofile}\Backupacl.acl"
+& ${env:windir}\system32\icacls.exe "${env:windir}" /restore "${env:userprofile}\Backupacl.acl"
 
 # Remove backup acl
 Remove-Item "${env:userprofile}\Backupacl.acl"
