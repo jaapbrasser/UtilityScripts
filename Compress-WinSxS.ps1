@@ -2,7 +2,7 @@
     try {
         $ServiceObject = New-Object -TypeName System.ServiceProcess.ServiceController
     } catch {
-        $null          = Get-Service -Name msiserver
+        $null          = Get-Service -Name msiserver -ErrorAction SilentlyContinue
         $ServiceObject = New-Object -TypeName System.ServiceProcess.ServiceController
     }
     if (Get-Member -InputObject $ServiceObject -MemberType Property -Name StartType) {
