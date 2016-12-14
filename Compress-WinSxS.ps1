@@ -90,8 +90,3 @@ if (Test-ServiceObject) {
 
 # Start services
 Start-Service -Name msiserver,trustedinstaller
-
-
-
-$OldSDDL = (sc.exe sdshow msiserver)[1]
-sc.exe /sdset $OldSDDL
