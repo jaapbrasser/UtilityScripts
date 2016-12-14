@@ -1,5 +1,10 @@
 ﻿function Test-ServiceObject {
-    $ServiceObject = New-Object -TypeName System.ServiceProcess.ServiceController
+    try {
+        $ServiceObject = New-Object -TypeName System.ServiceProcess.ServiceController
+    } catch {
+        $null          = Get-Service -Name msiserver
+        $ServiceObject = New-Object -TypeName System.ServiceProcess.ServiceController
+    }
     if (Get-Member -InputObject $ServiceObject -MemberType Property -Name StartType) {
         $true
     } else {
@@ -61,15 +66,15 @@ Get-Service -Name msiserver,trustedinstaller | Stop-Service -Force -Verbose
 & ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /save "${env:userprofile}\Backupacl.acl"
 
 # Take ownership and set ACL
-Invoke-ParseTakeOwn -InputObject (& ${env:windir}\system32\takeown.exe /f "${env:windir}\WinSxS" /r)
-Invoke-ParseIcacls -InputObject  (& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /grant "${env:userdomain}\${env:username}:(F)" /t)
+Invoke-ParseTakeOwn -InputObject (& ${env:windir}\system32\takeown.exe /f "${env:windir}\WinSxS" /r 2>&1)
+Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /grant "${env:userdomain}\${env:username}:(F)" /t 2>&1)
 
 # Compress WinSxS
-Invoke-ParseCompact -InputObject (& ${env:windir}\system32\compact.exe /s:"${env:windir}\WinSxS" /c /a /i *)
+Invoke-ParseCompact -InputObject (& ${env:windir}\system32\compact.exe /s:"${env:windir}\WinSxS" /c /a /i * 2>&1)
 
 # Restore WinSxS ACL
-& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /setowner "NT SERVICE\TrustedInstaller" /t
-& ${env:windir}\system32\icacls.exe "${env:windir}" /restore "${env:userprofile}\Backupacl.acl"
+Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /setowner "NT SERVICE\TrustedInstaller" /t 2>&1)
+Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}" /restore "${env:userprofile}\Backupacl.acl" 2>&1)
 
 # Remove backup acl
 Remove-Item "${env:userprofile}\Backupacl.acl"
@@ -85,3 +90,8 @@ if (Test-ServiceObject) {
 
 # Start services
 Start-Service -Name msiserver,trustedinstaller
+
+
+
+$OldSDDL = (sc.exe sdshow msiserver)[1]
+sc.exe /sdset $OldSDDL
