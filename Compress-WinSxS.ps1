@@ -1,4 +1,12 @@
-﻿function Test-ServiceObject {
+﻿<#
+.SYNOPSIS Script to compress the WinSxs folder to free up diskspace
+#>
+
+[cmdletbinding(ShouldSupportProcess=$true)]
+param(
+)
+
+function Test-ServiceObject {
     try {
         $ServiceObject = New-Object -TypeName System.ServiceProcess.ServiceController
     } catch {
@@ -66,22 +74,29 @@ Get-Service -Name msiserver,trustedinstaller | Stop-Service -Force -Verbose
 & ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /save "${env:userprofile}\Backupacl.acl"
 
 # Take ownership and set ACL
-Invoke-ParseTakeOwn -InputObject (& ${env:windir}\system32\takeown.exe /f "${env:windir}\WinSxS" /r 2>&1)
-Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /grant "${env:userdomain}\${env:username}:(F)" /t 2>&1)
+Invoke-ParseTakeOwn -InputObject (& ${env:windir}\system32\takeown.exe /f "${env:windir}\WinSxS" /r 2>&1) |
+Tee-Object -Variable TakeOwn  | Format-Table -AutoSize | Out-String | Write-Verbose
+
+Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /grant "${env:userdomain}\${env:username}:(F)" /t 2>&1) |
+Tee-Object -Variable SetAcl   | Format-Table -AutoSize | Out-String | Write-Verbose
 
 # Compress WinSxS
-Invoke-ParseCompact -InputObject (& ${env:windir}\system32\compact.exe /s:"${env:windir}\WinSxS" /c /a /i * 2>&1)
+Invoke-ParseCompact -InputObject (& ${env:windir}\system32\compact.exe /s:"${env:windir}\WinSxS" /c /a /i * 2>&1) |
+Tee-Object -Variable Compress | Format-Table -AutoSize | Out-String | Write-Verbose
 
 # Restore WinSxS ACL
-Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /setowner "NT SERVICE\TrustedInstaller" /t 2>&1)
-Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}" /restore "${env:userprofile}\Backupacl.acl" 2>&1)
+Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /setowner "NT SERVICE\TrustedInstaller" /t 2>&1) |
+Tee-Object -Variable SetOwn   | Format-Table -AutoSize | Out-String | Write-Verbose
+
+Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}" /restore "${env:userprofile}\Backupacl.acl" 2>&1) |
+Tee-Object -Variable ResAcl   | Format-Table -AutoSize | Out-String | Write-Verbose
 
 # Remove backup acl
 Remove-Item "${env:userprofile}\Backupacl.acl"
 
 # Start services and set startup to old value
 if (Test-ServiceObject) {
-    Set-Service -Name msiserver -StartupType $Service.MSIServer
+    Set-Service -Name msiserver        -StartupType $Service.MSIServer
     Set-Service -Name trustedinstaller -StartupType $Service.TrustedInstaller
 } else {
     (Get-WmiObject -Query "Select * FROM win32_service Where name='msiserver'").ChangeStartMode($Service.MSIServer)
@@ -90,3 +105,15 @@ if (Test-ServiceObject) {
 
 # Start services
 Start-Service -Name msiserver,trustedinstaller
+
+# Merge all output and write output to console
+Write-Output TakeOwn SetAcl Compress SetOwn ResAcl | ForEach-Object -Begin {
+    $Hash = @{}
+} -Process {
+    $Var = Get-Variable -Name $_
+    $Var.value.psobject.properties | Select-Object -ExpandProperty Name | ForEach-Object {
+        $Hash."$($Var.Name)$_" = $Var.value.$_
+    }
+} -End {
+    New-Object -TypeName PSCustomObject -Property $Hash
+}
