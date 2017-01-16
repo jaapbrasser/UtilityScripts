@@ -1,10 +1,8 @@
 ﻿<#
 .SYNOPSIS Script to compress the WinSxs folder to free up diskspace
 #>
-
-[cmdletbinding(ShouldSupportProcess=$true)]
-param(
-)
+[cmdletbinding(SupportsShouldProcess=$true)]
+param()
 
 function Test-ServiceObject {
     try {
@@ -59,11 +57,11 @@ $Service = @{}
 if (Test-ServiceObject) {
     $Service.MSIServer, $Service.TrustedInstaller = Get-Service -Name msiserver,trustedinstaller |
                                                     Select-Object -ExpandProperty StartType
-    Get-Service -Name msiserver,trustedinstaller | Set-Service -StartupType Disabled -Verbose
+    Get-Service -Name msiserver,trustedinstaller | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
 } else {
-    $Service.MSIServer        = Get-WmiObject -Query "Select StartMode FROM win32_service Where name='msiserver'" |
+    $Service.MSIServer        = Get-WmiObject -Query "Select StartMode FROM win32_service Where name='msiserver'" -ErrorAction SilentlyContinue |
                                 Select-Object -ExpandProperty StartMode
-    $Service.TrustedInstaller = Get-WmiObject -Query "Select StartMode FROM win32_service Where name='trustedinstaller'" |
+    $Service.TrustedInstaller = Get-WmiObject -Query "Select StartMode FROM win32_service Where name='trustedinstaller'" -ErrorAction SilentlyContinue |
                                 Select-Object -ExpandProperty StartMode
 }
 
@@ -71,7 +69,7 @@ if (Test-ServiceObject) {
 Get-Service -Name msiserver,trustedinstaller | Stop-Service -Force -Verbose
 
 # Backup WinSxS ACL
-& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /save "${env:userprofile}\Backupacl.acl"
+$null = & ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /save "${env:userprofile}\Backupacl.acl"
 
 # Take ownership and set ACL
 Invoke-ParseTakeOwn -InputObject (& ${env:windir}\system32\takeown.exe /f "${env:windir}\WinSxS" /r 2>&1) |
@@ -96,24 +94,28 @@ Remove-Item "${env:userprofile}\Backupacl.acl"
 
 # Start services and set startup to old value
 if (Test-ServiceObject) {
-    Set-Service -Name msiserver        -StartupType $Service.MSIServer
-    Set-Service -Name trustedinstaller -StartupType $Service.TrustedInstaller
+    Set-Service -Name msiserver        -ErrorAction SilentlyContinue -StartupType $Service.MSIServer
+    Set-Service -Name trustedinstaller -ErrorAction SilentlyContinue -StartupType $Service.TrustedInstaller
 } else {
     (Get-WmiObject -Query "Select * FROM win32_service Where name='msiserver'").ChangeStartMode($Service.MSIServer)
     (Get-WmiObject -Query "Select * FROM win32_service Where name='trustedinstaller'").ChangeStartMode($Service.TrustedInstaller)
 }
 
 # Start services
-Start-Service -Name msiserver,trustedinstaller
+Start-Service -Name msiserver,trustedinstaller -ErrorAction SilentlyContinue -StartupType
 
 # Merge all output and write output to console
 Write-Output TakeOwn SetAcl Compress SetOwn ResAcl | ForEach-Object -Begin {
-    $Hash = @{}
+    $Hash   = @{}
+    $SelectSplat = @{
+        Property = @()
+    }
 } -Process {
     $Var = Get-Variable -Name $_
     $Var.value.psobject.properties | Select-Object -ExpandProperty Name | ForEach-Object {
+        $SelectSplat          += "$($Var.Name)$_"
         $Hash."$($Var.Name)$_" = $Var.value.$_
     }
 } -End {
-    New-Object -TypeName PSCustomObject -Property $Hash
+    New-Object -TypeName PSCustomObject -Property $Hash | Select-Object @SelectSplat
 }
