@@ -10,9 +10,9 @@ Script originally created by Johan Arvid, I have adapted this script so it can r
 Name       : New-ISOfromESD.ps1
 Author     : Johan Arwidmark
 UpdatedBy  : Jaap Brasser
-Version    : 1.0
+Version    : 1.1
 DateCreated: 2016-05-03
-DateUpdated: 2016-06-24
+DateUpdated: 2017-01-18
 
 .PARAMETER ESDPath
 The location of the ESD File, this function will assume the current folder if it cannot find the file. If it cannot be found there it will attempt to copy it from: C:\$WINDOWS.~BT\Sources\Install.esd
