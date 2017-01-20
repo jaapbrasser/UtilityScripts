@@ -47,11 +47,14 @@ function Invoke-ParseCompact {
         Folders            = $InputObject[-3] -replace '^(.*?)\s.*?\s(\d*?)\s.*?$','$2'           -as [long]
         BytesPreCompressed = $InputObject[-2] -replace '^(.*?)\stotal.*$','$1' -replace '\D'      -as [long]
         BytesCompressed    = $InputObject[-2] -replace '.*?in\s(.*?)\sbytes.*','$1' -replace '\D' -as [long]
+        SpaceSavedGB       = [math]::Round((($InputObject[-2] -replace '^(.*?)\stotal.*$','$1' -replace '\D' -as [long]) -
+                             ($InputObject[-2] -replace '.*?in\s(.*?)\sbytes.*','$1' -replace '\D' -as [long]))/1GB,2)
         CompressionRatio   = $InputObject[-1] -replace '.*?is\s(.*?)\sto.*?$','$1'                -as [decimal]
         Target             = $InputObject[1] -replace '.*?in\s(.*?)$','$1'                        -as [System.IO.DirectoryInfo]
     }
 }
-
+1 -
+2
 # Set startup mode to Disabled and store current startup configuration
 $Service = @{}
 if (Test-ServiceObject) {
@@ -102,7 +105,7 @@ if (Test-ServiceObject) {
 }
 
 # Start services
-Start-Service -Name msiserver,trustedinstaller -ErrorAction SilentlyContinue -StartupType
+$null = Start-Service -Name msiserver,trustedinstaller -ErrorAction SilentlyContinue -Verbose
 
 # Merge all output and write output to console
 Write-Output TakeOwn SetAcl Compress SetOwn ResAcl | ForEach-Object -Begin {
@@ -113,7 +116,7 @@ Write-Output TakeOwn SetAcl Compress SetOwn ResAcl | ForEach-Object -Begin {
 } -Process {
     $Var = Get-Variable -Name $_
     $Var.value.psobject.properties | Select-Object -ExpandProperty Name | ForEach-Object {
-        $SelectSplat          += "$($Var.Name)$_"
+        $SelectSplat.Property += "$($Var.Name)$_"
         $Hash."$($Var.Name)$_" = $Var.value.$_
     }
 } -End {
