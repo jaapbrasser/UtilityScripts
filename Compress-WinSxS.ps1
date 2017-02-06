@@ -53,8 +53,7 @@ function Invoke-ParseCompact {
         Target             = $InputObject[1] -replace '.*?in\s(.*?)$','$1'                        -as [System.IO.DirectoryInfo]
     }
 }
-1 -
-2
+
 # Set startup mode to Disabled and store current startup configuration
 $Service = @{}
 if (Test-ServiceObject) {
