@@ -103,11 +103,11 @@ Remove-Item "${env:userprofile}\Backupacl.acl"
 
 # Start services and set startup to old value
 if (Test-ServiceObject) {
-    Set-Service -Name msiserver        -ErrorAction SilentlyContinue -StartupType $Service.MSIServer
-    Set-Service -Name trustedinstaller -ErrorAction SilentlyContinue -StartupType $Service.TrustedInstaller
+    $null = Set-Service -Name msiserver        -ErrorAction SilentlyContinue -StartupType $Service.MSIServer
+    $null = Set-Service -Name trustedinstaller -ErrorAction SilentlyContinue -StartupType $Service.TrustedInstaller
 } else {
-    (Get-WmiObject -Query "Select * FROM win32_service Where name='msiserver'").ChangeStartMode($Service.MSIServer)
-    (Get-WmiObject -Query "Select * FROM win32_service Where name='trustedinstaller'").ChangeStartMode($Service.TrustedInstaller)
+    $null = (Get-WmiObject -Query "Select * FROM win32_service Where name='msiserver'").ChangeStartMode($Service.MSIServer)
+    $null = (Get-WmiObject -Query "Select * FROM win32_service Where name='trustedinstaller'").ChangeStartMode($Service.TrustedInstaller)
 }
 
 # Start services
