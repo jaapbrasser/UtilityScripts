@@ -71,27 +71,34 @@ if (Test-ServiceObject) {
 Get-Service -Name msiserver,trustedinstaller | Stop-Service -Force -Verbose
 
 # Backup WinSxS ACL
+Write-Verbose 'Making a backup of the permissions on {0} and storing it in: {1}' -f "${env:windir}\WinSxS","${env:userprofile}\Backupacl.acl"
 $null = & ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /save "${env:userprofile}\Backupacl.acl"
 
 # Take ownership and set ACL
+Write-Verbose 'Taking ownership of WinSxS'
 Invoke-ParseTakeOwn -InputObject (& ${env:windir}\system32\takeown.exe /f "${env:windir}\WinSxS" /r 2>&1) |
 Tee-Object -Variable TakeOwn  | Format-Table -AutoSize | Out-String | Write-Verbose
 
+Write-Verbose 'Granting current user Full Control on WinSxS folder'
 Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /grant "${env:userdomain}\${env:username}:(F)" /t 2>&1) |
 Tee-Object -Variable SetAcl   | Format-Table -AutoSize | Out-String | Write-Verbose
 
 # Compress WinSxS
+Write-Verbose 'Starting compression of WinSxS folder'
 Invoke-ParseCompact -InputObject (& ${env:windir}\system32\compact.exe /s:"${env:windir}\WinSxS" /c /a /i * 2>&1) |
 Tee-Object -Variable Compress | Format-Table -AutoSize | Out-String | Write-Verbose
 
 # Restore WinSxS ACL
+Write-Verbose 'Restoring ownership of WinSxS to trustedinstaller'
 Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}\WinSxS" /setowner "NT SERVICE\TrustedInstaller" /t 2>&1) |
 Tee-Object -Variable SetOwn   | Format-Table -AutoSize | Out-String | Write-Verbose
 
+Write-Verbose 'Restoring the earlier backup of the permissions on WinSxS'
 Invoke-ParseIcacls  -InputObject (& ${env:windir}\system32\icacls.exe "${env:windir}" /restore "${env:userprofile}\Backupacl.acl" 2>&1) |
 Tee-Object -Variable ResAcl   | Format-Table -AutoSize | Out-String | Write-Verbose
 
 # Remove backup acl
+Write-Verbose 'Removing backup of ACLs from home folder'
 Remove-Item "${env:userprofile}\Backupacl.acl"
 
 # Start services and set startup to old value
