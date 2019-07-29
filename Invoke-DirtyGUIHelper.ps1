@@ -17,9 +17,6 @@ Blog       : http://www.jaapbrasser.com
 .LINK
 http://www.jaapbrasser.com
 
-.PARAMETER ProcessName
-The name of the program on which prompt ALT + Y will be send
-
 .EXAMPLE   
 . .\Invoke-DirtyGUIHelper
     
@@ -38,6 +35,9 @@ Will attempt to activate the firefox windows 5 times and afterwards sending the 
         [Parameter(Mandatory,
                    Position=0
         )]
+        
+        # The name of the program on which prompt ALT + Y will be send
+
         $ProcessName
     )
 
